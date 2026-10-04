@@ -83,7 +83,6 @@ WARNING_CODES = {
 # サンプルデータの読み込み
 DATA_FILE = os.path.join(APP_DIR, 'data', 'shelters.json')
 INSTRUCTIONS_FILE = os.path.join(APP_DIR, 'data', 'instructions.json')
-NOTIFICATION_HISTORY_FILE = os.path.join(APP_DIR, 'data', 'notification_history.json')
 
 def load_json(path, default):
     """JSONファイルを読み込む（存在しない・壊れている場合は default を返す）"""
@@ -286,32 +285,6 @@ def parse_notification_time(value):
     return datetime.min.replace(tzinfo=JST)
 
 
-def get_disaster_kind(entry):
-    """災害情報の種別を判定する"""
-    if isinstance(entry, dict) and entry.get('has_emergency'):
-        return 'emergency'
-    if isinstance(entry, dict) and entry.get('has_warning'):
-        return 'warning'
-    if isinstance(entry, dict) and entry.get('has_advisory'):
-        return 'advisory'
-    return 'info'
-
-
-def get_disaster_summary(entry):
-    """災害情報の要約文を生成する"""
-    if not isinstance(entry, dict):
-        return '災害情報なし'
-
-    warning_names = [
-        warning.get('name', '')
-        for warning in entry.get('warnings', [])
-        if isinstance(warning, dict)
-    ]
-    if warning_names:
-        return ' / '.join(warning_names)
-    return '災害情報なし'
-
-
 def parse_instruction_time(value):
     """指示の時刻文字列を datetime に変換する"""
     if not value:
@@ -372,19 +345,23 @@ def get_resident_instructions():
 
 
 def get_disaster_notifications(selected_type='all'):
-    """新しい順に災害情報を取得する"""
-    records = load_json(NOTIFICATION_HISTORY_FILE, [])
-    sorted_records = sorted(
-        records,
-        key=lambda item: parse_notification_time(item.get('timestamp')),
-        reverse=True,
-    )
-
+    """青森市の最新の気象庁警報・注意報を災害情報として返す"""
+    weather = get_weather_warnings()
+    timestamp = weather.get('last_fetch_time', get_japan_time())
+    report_time = weather.get('report_time', '不明')
+    area_name = weather.get('area_name', AREA_NAME)
+    warnings = weather.get('warnings', [])
     items = []
-    for record in sorted_records:
-        kind = get_disaster_kind(record)
-        if selected_type != 'all' and kind != selected_type:
-            continue
+
+    for warning in warnings:
+        code = warning.get('code', '')
+        name = warning.get('name', '警報・注意報')
+        if code in ('32', '33', '35', '36', '37', '38', '39', '43', '48', '49'):
+            kind = 'emergency'
+        elif '警報' in name:
+            kind = 'warning'
+        else:
+            kind = 'advisory'
 
         items.append({
             'kind': kind,
@@ -392,22 +369,40 @@ def get_disaster_notifications(selected_type='all'):
                 'emergency': '緊急',
                 'warning': '警報',
                 'advisory': '注意報',
-                'info': '通常',
-            }.get(kind, '通常'),
+            }[kind],
             'kind_icon': {
                 'emergency': '🚨',
                 'warning': '⚠️',
                 'advisory': '📣',
-                'info': 'ℹ️',
-            }.get(kind, 'ℹ️'),
-            'timestamp': record.get('timestamp', '不明'),
-            'report_time': record.get('report_time', '不明'),
-            'area_name': record.get('area_name', '不明'),
-            'summary': get_disaster_summary(record),
-            'warning_count': record.get('warning_count', 0),
+            }[kind],
+            'timestamp': timestamp,
+            'report_time': report_time,
+            'area_name': area_name,
+            'summary': f"{name}（{warning.get('status', '発表')}）",
+            'warning_count': 1,
         })
 
-    return items
+    if not items:
+        kind = 'info'
+        items.append({
+            'kind': kind,
+            'kind_label': '通常',
+            'kind_icon': 'ℹ️',
+            'timestamp': timestamp,
+            'report_time': report_time,
+            'area_name': area_name,
+            'summary': (
+                '気象情報を取得できませんでした'
+                if weather.get('error')
+                else '警報・注意報は発表されていません'
+            ),
+            'warning_count': 0,
+        })
+
+    return [
+        item for item in items
+        if selected_type == 'all' or item['kind'] == selected_type
+    ]
 
 
 # トップページ：templates/index.html を返す（住民向け指示も表示する）

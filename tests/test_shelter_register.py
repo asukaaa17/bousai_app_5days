@@ -76,3 +76,35 @@ def test_home_page_shows_latest_resident_instructions_with_urgent_highlight():
     assert '新着指示' in html
     assert '土砂災害の危険があるため避難してください' in html
     assert 'instruction-urgent' in html
+
+
+def test_disaster_notifications_use_aomori_weather_warnings(monkeypatch):
+    monkeypatch.setattr(app_module, 'get_weather_warnings', lambda: {
+        'area_name': '青森市',
+        'warnings': [{'name': '暴風警報', 'code': '05', 'status': '発表'}],
+        'report_time': '2026年10月04日 09:00',
+        'last_fetch_time': '2026年10月04日 09:10',
+    })
+
+    items = app_module.get_disaster_notifications()
+
+    assert len(items) == 1
+    assert items[0]['area_name'] == '青森市'
+    assert items[0]['kind'] == 'warning'
+    assert items[0]['summary'] == '暴風警報（発表）'
+
+
+def test_disaster_notifications_show_aomori_when_no_warnings(monkeypatch):
+    monkeypatch.setattr(app_module, 'get_weather_warnings', lambda: {
+        'area_name': '青森市',
+        'warnings': [],
+        'report_time': '2026年10月04日 09:00',
+        'last_fetch_time': '2026年10月04日 09:10',
+    })
+
+    items = app_module.get_disaster_notifications()
+
+    assert len(items) == 1
+    assert items[0]['area_name'] == '青森市'
+    assert items[0]['kind'] == 'info'
+    assert items[0]['summary'] == '警報・注意報は発表されていません'
