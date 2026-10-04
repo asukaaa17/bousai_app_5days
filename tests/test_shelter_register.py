@@ -65,3 +65,14 @@ def test_parse_weather_warning_with_jma_format(monkeypatch):
         'code': '03',
         'status': '発表'
     }]
+
+
+def test_home_page_shows_latest_resident_instructions_with_urgent_highlight():
+    client = app.test_client()
+    response = client.get('/')
+    html = response.get_data(as_text=True)
+
+    assert response.status_code == 200
+    assert '新着指示' in html
+    assert '土砂災害の危険があるため避難してください' in html
+    assert 'instruction-urgent' in html

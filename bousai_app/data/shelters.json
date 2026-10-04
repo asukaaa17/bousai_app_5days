@@ -1,38 +1,121 @@
 [
   {
     "id": 1,
-    "name": "御所見小学校"
+    "name": "御所見小学校",
+    "status": "open",
+    "latitude": 40.82,
+    "longitude": 140.74
   },
   {
     "id": 2,
-    "name": "片瀬小学校"
+    "name": "片瀬小学校",
+    "status": "open",
+    "latitude": 40.832,
+    "longitude": 140.75300000000001
   },
   {
     "id": 5,
-    "name": "鵠洋小学校"
+    "name": "鵠洋小学校",
+    "status": "open",
+    "latitude": 40.844,
+    "longitude": 140.76600000000002
   },
   {
     "id": 6,
-    "name": "新しい避難所"
+    "name": "新しい避難所",
+    "status": "open",
+    "latitude": 40.856,
+    "longitude": 140.779
   },
   {
     "id": 7,
-    "name": "新しい避難所"
+    "name": "新しい避難所",
+    "status": "open",
+    "latitude": 40.868,
+    "longitude": 140.74
   },
   {
     "id": 8,
-    "name": "あ"
+    "name": "あ",
+    "status": "open",
+    "latitude": 40.82,
+    "longitude": 140.75300000000001
   },
   {
     "id": 9,
-    "name": "新しい避難所"
+    "name": "新しい避難所",
+    "status": "open",
+    "latitude": 40.832,
+    "longitude": 140.76600000000002
   },
   {
     "id": 10,
-    "name": "新しい避難所"
+    "name": "新しい避難所",
+    "status": "open",
+    "latitude": 40.844,
+    "longitude": 140.779
   },
   {
     "id": 11,
-    "name": "新しい避難所"
+    "name": "新しい避難所",
+    "status": "open",
+    "latitude": 40.856,
+    "longitude": 140.74
+  },
+  {
+    "id": 12,
+    "name": "新しい避難所",
+    "status": "open",
+    "latitude": 40.868,
+    "longitude": 140.75300000000001
+  },
+  {
+    "id": 13,
+    "name": "新しい避難所",
+    "status": "open",
+    "latitude": 40.82,
+    "longitude": 140.76600000000002
+  },
+  {
+    "id": 14,
+    "name": "新しい避難所",
+    "status": "open",
+    "latitude": 40.832,
+    "longitude": 140.779
+  },
+  {
+    "id": 15,
+    "name": "新しい避難所",
+    "status": "open",
+    "latitude": 40.844,
+    "longitude": 140.74
+  },
+  {
+    "id": 16,
+    "name": "新しい避難所",
+    "status": "open",
+    "latitude": 40.856,
+    "longitude": 140.75300000000001
+  },
+  {
+    "id": 17,
+    "name": "新しい避難所",
+    "status": "open",
+    "latitude": 40.868,
+    "longitude": 140.76600000000002
+  },
+  {
+    "id": 18,
+    "name": "新しい避難所",
+    "status": "open",
+    "latitude": 40.82,
+    "longitude": 140.779
+  },
+  {
+    "id": 19,
+    "name": "新しい避難所",
+    "status": "open",
+    "latitude": 40.832,
+    "longitude": 140.74
   }
 ]

@@ -18,6 +18,21 @@
     <label for="name">避難所名（必須）</label><br>
     <input type="text" id="name" name="name">
   </p>
+  <p>
+    <label for="status">開設状況</label><br>
+    <select id="status" name="status">
+      <option value="open">開設中</option>
+      <option value="closed">休止中</option>
+    </select>
+  </p>
+  <p>
+    <label for="latitude">緯度（任意）</label><br>
+    <input type="number" id="latitude" name="latitude" step="0.000001" placeholder="40.82">
+  </p>
+  <p>
+    <label for="longitude">経度（任意）</label><br>
+    <input type="number" id="longitude" name="longitude" step="0.000001" placeholder="140.74">
+  </p>
   <p><button type="submit">登録</button></p>
 </form>
 {% endblock %}

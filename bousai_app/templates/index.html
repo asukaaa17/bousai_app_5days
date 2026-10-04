@@ -2,28 +2,86 @@
 
 {% block content %}
 <div class="page-shell">
+  <section class="emergency-banner">
+    {% if emergency_notice %}
+      <div class="emergency-header">
+        <span class="emergency-icon">🚨</span>
+        <span>緊急のお知らせ</span>
+      </div>
+      <div class="emergency-body">
+        <div class="emergency-title">{{ emergency_notice.summary }}</div>
+        <div class="emergency-meta">
+          <span>{{ emergency_notice.area_name }}</span>
+          <span>受信日時: {{ emergency_notice.timestamp }}</span>
+        </div>
+      </div>
+    {% else %}
+      <div class="emergency-header">
+        <span class="emergency-icon">ℹ️</span>
+        <span>緊急のお知らせ</span>
+      </div>
+      <div class="emergency-body">
+        <div class="emergency-title">現在、緊急の災害情報はありません。</div>
+      </div>
+    {% endif %}
+  </section>
+
+  <section class="card instruction-card">
+    <div class="instruction-header">
+      <span class="semantic-icon" aria-label="新着指示">📣</span>
+      <h2 class="section-title">新着指示</h2>
+    </div>
+
+    <div class="instruction-list">
+      {% for notice in resident_notices %}
+        <article class="instruction-item {% if notice.is_urgent %}instruction-urgent{% endif %}">
+          <div class="instruction-topline">
+            <span class="instruction-badge {% if notice.is_urgent %}urgent{% else %}normal{% endif %}">
+              {{ '緊急' if notice.is_urgent else '通常' }}
+            </span>
+            <span class="instruction-time">{{ notice.created_at or '時刻不明' }}</span>
+          </div>
+          <div class="instruction-content">{{ notice.content }}</div>
+          {% if notice.shelter %}
+            <div class="instruction-shelter">避難先: {{ notice.shelter }}</div>
+          {% endif %}
+        </article>
+      {% else %}
+        <div class="empty-message">新着の住民向け指示はありません。</div>
+      {% endfor %}
+    </div>
+  </section>
+
   <section class="card map-card">
+
     <h2 class="section-title">
       <span class="semantic-icon" aria-label="避難所マップ">
-        <svg viewBox="0 0 24 24" aria-hidden="true">
-          <path d="M12 21s6-5.4 6-11a6 6 0 1 0-12 0c0 5.6 6 11 6 11Z"></path>
-          <circle cx="12" cy="10" r="2.5"></circle>
-          <path d="M9 17.5h6"></path>
+        <svg viewBox="0 0 24 24" aria-hidden="true" style="fill:#2458ad;stroke:none">
+          <path d="M12 22s8-7.2 8-13A8 8 0 1 0 4 9c0 5.8 8 13 8 13Z"></path>
+          <circle cx="12" cy="9" r="2.7" style="fill:#fff"></circle>
         </svg>
       </span>
       避難所マップ
     </h2>
-    <div id="shelterMap"></div>
+    <div id="shelterMap" aria-label="避難所マップ"></div>
+
+    <div class="map-legend" aria-label="凡例">
+      <div class="legend-item"><span class="legend-dot current-dot"></span>現在地</div>
+      <div class="legend-item"><span class="legend-dot open-dot"></span>開設中</div>
+      <div class="legend-item"><span class="legend-dot closed-dot"></span>休止中</div>
+    </div>
   </section>
 
   <section class="card weather-card">
     <div class="weather-header">
       <div class="weather-brand weather-badge">
         <span class="semantic-icon" aria-label="気象警報・注意報">
-          <svg viewBox="0 0 24 24" aria-hidden="true">
-            <circle cx="12" cy="12" r="4"></circle>
-            <path d="M12 2v2.5M12 19.5V22M4.93 4.93l1.77 1.77M17.3 17.3l1.77 1.77M2 12h2.5M19.5 12H22M4.93 19.07l1.77-1.77M17.3 6.7l1.77-1.77"></path>
-            <path d="M7.5 16.5A3.5 3.5 0 0 1 7 12.7 4 4 0 0 1 15.1 11a3.2 3.2 0 1 1 2.9 5.5H7.5Z"></path>
+          <svg class="reference-icon weather-heading-icon" viewBox="0 0 32 32" aria-hidden="true">
+            <g fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round">
+              <circle cx="11" cy="11" r="5"></circle>
+              <path d="M11 2v2M11 18v2M2 11h2M18 11h2M4.6 4.6 6 6M16 16l1.4 1.4M17.4 4.6 16 6"></path>
+            </g>
+            <path d="M11 25h13a5 5 0 0 0 0-10 7 7 0 0 0-13.1 1.8A4.2 4.2 0 0 0 11 25Z" fill="currentColor"></path>
           </svg>
         </span>
         <span>青森市 気象警報・注意報</span>
@@ -32,10 +90,60 @@
     </div>
 
     <div id="weatherContent" class="weather-body">
-      <div class="weather-city"><span class="dot-marker"></span>青森市</div>
-      <div class="weather-status"><span class="checkmark">✓</span>現在、警報・注意報は発表されていません</div>
-      <div class="weather-meta"><span class="meter"></span>データ取得時刻: 更新中...</div>
-      <div class="weather-meta"><span class="meter"></span>気象庁発表: 更新中...</div>
+      <div class="weather-city">
+        <svg class="reference-icon weather-location-icon" viewBox="0 0 20 20" aria-hidden="true"><path fill="currentColor" d="M10 19s7-6.3 7-11A7 7 0 1 0 3 8c0 4.7 7 11 7 11Z"></path><circle cx="10" cy="8" r="2.2" fill="#fff"></circle></svg>
+        青森市
+      </div>
+      <div class="weather-status">
+        <svg class="reference-icon weather-check-icon" viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="9" fill="currentColor"></circle><path d="m5.5 10 3 3 6-6" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+        現在、警報・注意報は発表されていません
+      </div>
+      <div class="weather-meta"><svg class="reference-icon weather-meta-icon" viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="7.5" fill="none" stroke="currentColor" stroke-width="1.8"></circle><path d="M10 5.5v4.8l3 1.8" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></path></svg>データ取得時刻: 更新中...</div>
+      <div class="weather-meta"><svg class="reference-icon weather-meta-icon" viewBox="0 0 20 20" aria-hidden="true"><path d="M3 7a9 9 0 0 0 10 10L3 7Z" fill="currentColor"></path><path d="m3 7 10 10m-2-9a6 6 0 0 1 6 6m-6-9a9 9 0 0 1 9 9M8 17l-2 2m4-2 1 2" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></path></svg>気象庁発表: 更新中...</div>
+    </div>
+  </section>
+
+  <section class="card disaster-card">
+    <div class="disaster-toolbar">
+      <div class="disaster-title-wrap">
+        <span class="disaster-title-icon">📡</span>
+        <h2 class="disaster-title">災害情報</h2>
+      </div>
+
+      <div class="toolbar-right">
+        <label class="filter-label" for="disasterType">情報の種類</label>
+        <select id="disasterType" class="filter-select" onchange="location.href='/?type=' + this.value">
+          {% for value, label in disaster_type_options %}
+            <option value="{{ value }}" {% if selected_type == value %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+        <button type="button" class="refresh-button" onclick="window.location.reload();">更新</button>
+      </div>
+    </div>
+
+    <div class="last-update-row">
+      <span>最終更新日時: {{ last_update }}</span>
+    </div>
+
+    <div class="disaster-list">
+      {% for item in disaster_items %}
+        <article class="disaster-item kind-{{ item.kind }}">
+          <div class="disaster-icon" aria-label="{{ item.kind_label }}">{{ item.kind_icon }}</div>
+          <div class="disaster-content">
+            <div class="disaster-header-line">
+              <span class="tag tag-{{ item.kind }}">{{ item.kind_label }}</span>
+              <span class="disaster-area">{{ item.area_name }}</span>
+            </div>
+            <div class="disaster-summary">{{ item.summary }}</div>
+            <div class="disaster-meta">
+              <span>受信日時: {{ item.timestamp }}</span>
+              <span>発表時刻: {{ item.report_time }}</span>
+            </div>
+          </div>
+        </article>
+      {% else %}
+        <div class="empty-message">表示する災害情報がありません。</div>
+      {% endfor %}
     </div>
   </section>
 </div>
@@ -46,6 +154,11 @@
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     const map = L.map('shelterMap', { zoomControl: false }).setView([40.8200, 140.7500], 11);
+  const locationIcon = '<svg class="reference-icon weather-location-icon" viewBox="0 0 20 20" aria-hidden="true"><path fill="currentColor" d="M10 19s7-6.3 7-11A7 7 0 1 0 3 8c0 4.7 7 11 7 11Z"></path><circle cx="10" cy="8" r="2.2" fill="#fff"></circle></svg>';
+  const checkIcon = '<svg class="reference-icon weather-check-icon" viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="9" fill="currentColor"></circle><path d="m5.5 10 3 3 6-6" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg>';
+  const alertIcon = '<svg class="reference-icon weather-alert-icon" viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="9" fill="currentColor"></circle><path d="M10 5.5v5M10 14v.2" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"></path></svg>';
+  const clockIcon = '<svg class="reference-icon weather-meta-icon" viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="7.5" fill="none" stroke="currentColor" stroke-width="1.8"></circle><path d="M10 5.5v4.8l3 1.8" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></path></svg>';
+  const reportIcon = '<svg class="reference-icon weather-meta-icon" viewBox="0 0 20 20" aria-hidden="true"><path d="M3 7a9 9 0 0 0 10 10L3 7Z" fill="currentColor"></path><path d="m3 7 10 10m-2-9a6 6 0 0 1 6 6m-6-9a9 9 0 0 1 9 9M8 17l-2 2m4-2 1 2" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></path></svg>';
 
     L.control.zoom({ position: 'topleft' }).addTo(map);
 
@@ -53,6 +166,59 @@ document.addEventListener('DOMContentLoaded', function() {
         attribution: '© OpenStreetMap contributors',
         referrerPolicy: 'strict-origin-when-cross-origin'
     }).addTo(map);
+
+    function renderShelterMap() {
+        fetch('/api/shelter_map')
+            .then(response => response.json())
+            .then(data => {
+                const shelters = data.shelters || [];
+                shelters.forEach(shelter => {
+                    const status = shelter.status === 'closed' ? 'closed' : 'open';
+                    const color = status === 'closed' ? '#ea5a5a' : '#2bb673';
+                    const marker = L.marker([shelter.latitude, shelter.longitude], {
+                        icon: L.divIcon({
+                            className: 'custom-shelter-marker',
+                            html: '<span style="background:' + color + '; width: 16px; height: 16px; display: block; border-radius: 50%; border: 2px solid white; box-shadow: 0 0 0 1px rgba(0,0,0,0.08);"></span>',
+                            iconSize: [16, 16],
+                            iconAnchor: [8, 8],
+                            popupAnchor: [0, -8]
+                        })
+                    });
+
+                    marker.bindPopup(`<strong>${shelter.name}</strong><br>${status === 'open' ? '開設中' : '休止中'}`);
+                    marker.addTo(map);
+                });
+            })
+            .catch(() => {
+                console.warn('避難所情報の取得に失敗しました');
+            });
+    }
+
+    if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+            position => {
+                const lat = position.coords.latitude;
+                const lng = position.coords.longitude;
+                const currentMarker = L.marker([lat, lng], {
+                    icon: L.divIcon({
+                        className: 'current-location-marker',
+                        html: '<span style="background:#1f7acc; width: 16px; height: 16px; display: block; border-radius: 50%; border: 3px solid white; box-shadow: 0 0 0 2px rgba(31,122,204,0.2);"></span>',
+                        iconSize: [16, 16],
+                        iconAnchor: [8, 8],
+                        popupAnchor: [0, -10]
+                    })
+                });
+                currentMarker.bindPopup('現在地');
+                currentMarker.addTo(map);
+                map.setView([lat, lng], 12);
+            },
+            () => {
+                map.setView([40.8200, 140.7500], 11);
+            }
+        );
+    }
+
+    renderShelterMap();
 
     function updateWeatherWarnings() {
         fetch('/api/weather_warnings')
@@ -63,8 +229,8 @@ document.addEventListener('DOMContentLoaded', function() {
             .catch(() => {
                 const weatherContent = document.getElementById('weatherContent');
                 weatherContent.innerHTML = `
-                    <div class="weather-city"><span class="dot-marker"></span>青森市</div>
-                    <div class="weather-status"><span class="checkmark">!</span>気象情報の取得に失敗しました</div>
+                <div class="weather-city">${locationIcon}青森市</div>
+                <div class="weather-status">${alertIcon}気象情報の取得に失敗しました</div>
                 `;
             });
     }
@@ -74,8 +240,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
         if (data.error) {
             weatherContent.innerHTML = `
-                <div class="weather-city"><span class="dot-marker"></span>${data.area_name || '青森市'}</div>
-                <div class="weather-status"><span class="checkmark">!</span>気象情報の取得に失敗しました</div>
+            <div class="weather-city">${locationIcon}${data.area_name || '青森市'}</div>
+            <div class="weather-status">${alertIcon}気象情報の取得に失敗しました</div>
             `;
             return;
         }
@@ -86,18 +252,18 @@ document.addEventListener('DOMContentLoaded', function() {
 
         let warningsHtml = '';
         if (data.warnings && data.warnings.length > 0) {
-            warningsHtml = '<div class="weather-status"><span class="checkmark">!</span>' +
+          warningsHtml = '<div class="weather-status">' + alertIcon +
                 data.warnings.map(w => `${w.name}（${w.status}）`).join('・') +
                 '</div>';
         } else {
-            warningsHtml = '<div class="weather-status"><span class="checkmark">✓</span>現在、警報・注意報は発表されていません</div>';
+          warningsHtml = '<div class="weather-status">' + checkIcon + '現在、警報・注意報は発表されていません</div>';
         }
 
         weatherContent.innerHTML = `
-            <div class="weather-city"><span class="dot-marker"></span>${areaName}</div>
+          <div class="weather-city">${locationIcon}${areaName}</div>
             ${warningsHtml}
-            <div class="weather-meta"><span class="meter"></span>データ取得時刻: ${lastFetch}</div>
-            <div class="weather-meta"><span class="meter"></span>気象庁発表: ${reportTime}</div>
+          <div class="weather-meta">${clockIcon}データ取得時刻: ${lastFetch}</div>
+          <div class="weather-meta">${reportIcon}気象庁発表: ${reportTime}</div>
         `;
     }
 

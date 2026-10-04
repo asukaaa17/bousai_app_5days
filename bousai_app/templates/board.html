@@ -12,10 +12,12 @@
 <table border="1" cellpadding="5">
   <tr>
     <th>内容</th>
+    <th>緊急度</th>
   </tr>
   {% for inst in instructions %}
-  <tr>
+  <tr {% if inst.is_urgent %}style="background:#fff3f3; color:#8b1b1b;"{% endif %}>
     <td>{{ inst.content }}{% if inst.shelter %}（避難先: {{ inst.shelter }}）{% endif %}</td>
+    <td>{% if inst.is_urgent %}緊急{% else %}通常{% endif %}</td>
   </tr>
   {% endfor %}
 </table>

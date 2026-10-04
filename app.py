@@ -83,6 +83,7 @@ WARNING_CODES = {
 # サンプルデータの読み込み
 DATA_FILE = os.path.join(APP_DIR, 'data', 'shelters.json')
 INSTRUCTIONS_FILE = os.path.join(APP_DIR, 'data', 'instructions.json')
+NOTIFICATION_HISTORY_FILE = os.path.join(APP_DIR, 'data', 'notification_history.json')
 
 def load_json(path, default):
     """JSONファイルを読み込む（存在しない・壊れている場合は default を返す）"""
@@ -92,7 +93,25 @@ def load_json(path, default):
     except (FileNotFoundError, json.JSONDecodeError):
         return default
 
-shelters = load_json(DATA_FILE, [])
+def normalize_shelter(shelter, index=0):
+    """避難所データに不足している項目を補完する"""
+    if not isinstance(shelter, dict):
+        return shelter
+
+    normalized = dict(shelter)
+    normalized['status'] = normalized.get('status', 'open')
+    normalized['latitude'] = normalized.get('latitude')
+    normalized['longitude'] = normalized.get('longitude')
+
+    if normalized['latitude'] is None:
+        normalized['latitude'] = 40.82 + (index % 5) * 0.012
+    if normalized['longitude'] is None:
+        normalized['longitude'] = 140.74 + (index % 4) * 0.013
+
+    return normalized
+
+
+shelters = [normalize_shelter(s, index) for index, s in enumerate(load_json(DATA_FILE, []))]
 instructions = load_json(INSTRUCTIONS_FILE, [])
 
 def save_instructions():
@@ -245,11 +264,180 @@ def get_weather_warnings():
         }
 
 
+def parse_notification_time(value):
+    """通知の時刻文字列を datetime に変換する"""
+    if not value:
+        return datetime.min.replace(tzinfo=JST)
+
+    for fmt in (
+        "%Y年%m月%d日 %H:%M",
+        "%Y/%m/%d %H:%M",
+        "%Y-%m-%d %H:%M:%S",
+        "%Y-%m-%dT%H:%M:%S%z",
+        "%Y-%m-%dT%H:%M:%S",
+    ):
+        try:
+            if fmt.endswith('%z'):
+                return datetime.strptime(value, fmt).astimezone(JST)
+            return datetime.strptime(value, fmt).replace(tzinfo=JST)
+        except ValueError:
+            continue
+
+    return datetime.min.replace(tzinfo=JST)
+
+
+def get_disaster_kind(entry):
+    """災害情報の種別を判定する"""
+    if isinstance(entry, dict) and entry.get('has_emergency'):
+        return 'emergency'
+    if isinstance(entry, dict) and entry.get('has_warning'):
+        return 'warning'
+    if isinstance(entry, dict) and entry.get('has_advisory'):
+        return 'advisory'
+    return 'info'
+
+
+def get_disaster_summary(entry):
+    """災害情報の要約文を生成する"""
+    if not isinstance(entry, dict):
+        return '災害情報なし'
+
+    warning_names = [
+        warning.get('name', '')
+        for warning in entry.get('warnings', [])
+        if isinstance(warning, dict)
+    ]
+    if warning_names:
+        return ' / '.join(warning_names)
+    return '災害情報なし'
+
+
+def parse_instruction_time(value):
+    """指示の時刻文字列を datetime に変換する"""
+    if not value:
+        return datetime.min.replace(tzinfo=JST)
+
+    for fmt in (
+        "%Y年%m月%d日 %H:%M",
+        "%Y/%m/%d %H:%M",
+        "%Y-%m-%d %H:%M:%S",
+        "%Y-%m-%dT%H:%M:%S%z",
+        "%Y-%m-%dT%H:%M:%S",
+    ):
+        try:
+            if fmt.endswith('%z'):
+                return datetime.strptime(value, fmt).astimezone(JST)
+            return datetime.strptime(value, fmt).replace(tzinfo=JST)
+        except ValueError:
+            continue
+
+    return datetime.min.replace(tzinfo=JST)
+
+
+def is_urgent_instruction(instruction):
+    """避難や危険に関する住民向け指示を緊急扱いにする"""
+    if not isinstance(instruction, dict):
+        return False
+
+    text = "{} {} {}".format(
+        instruction.get('content', ''),
+        instruction.get('shelter', ''),
+        instruction.get('status', ''),
+    ).lower()
+
+    urgent_keywords = (
+        '避難', '危険', '緊急', '土砂災害', '津波', '警戒', '避難指示', '高台',
+        '警報', '特別警報', '浸水', '倒壊', '通行止め'
+    )
+    return any(keyword in text for keyword in urgent_keywords)
+
+
+def get_resident_instructions():
+    """住民向けの指示を新着順に取得し、緊急度も付与する"""
+    resident_instructions = []
+    for instruction in instructions:
+        if instruction.get('target') != '住民':
+            continue
+
+        item = dict(instruction)
+        item['is_urgent'] = is_urgent_instruction(item)
+        item['priority_label'] = '緊急' if item['is_urgent'] else '通常'
+        resident_instructions.append(item)
+
+    resident_instructions.sort(
+        key=lambda item: parse_instruction_time(item.get('created_at')),
+        reverse=True,
+    )
+    return resident_instructions
+
+
+def get_disaster_notifications(selected_type='all'):
+    """新しい順に災害情報を取得する"""
+    records = load_json(NOTIFICATION_HISTORY_FILE, [])
+    sorted_records = sorted(
+        records,
+        key=lambda item: parse_notification_time(item.get('timestamp')),
+        reverse=True,
+    )
+
+    items = []
+    for record in sorted_records:
+        kind = get_disaster_kind(record)
+        if selected_type != 'all' and kind != selected_type:
+            continue
+
+        items.append({
+            'kind': kind,
+            'kind_label': {
+                'emergency': '緊急',
+                'warning': '警報',
+                'advisory': '注意報',
+                'info': '通常',
+            }.get(kind, '通常'),
+            'kind_icon': {
+                'emergency': '🚨',
+                'warning': '⚠️',
+                'advisory': '📣',
+                'info': 'ℹ️',
+            }.get(kind, 'ℹ️'),
+            'timestamp': record.get('timestamp', '不明'),
+            'report_time': record.get('report_time', '不明'),
+            'area_name': record.get('area_name', '不明'),
+            'summary': get_disaster_summary(record),
+            'warning_count': record.get('warning_count', 0),
+        })
+
+    return items
+
+
 # トップページ：templates/index.html を返す（住民向け指示も表示する）
 @app.route('/')
 def index():
-    resident_notices = [i for i in instructions if i.get('target') == '住民']
-    return render_template('index.html', resident_notices=resident_notices)
+    resident_notices = get_resident_instructions()
+    selected_type = request.args.get('type', 'all')
+    disaster_items = get_disaster_notifications(selected_type)
+    emergency_notice = next((item for item in disaster_items if item['kind'] == 'emergency'), None)
+
+    last_update = max(
+        [parse_notification_time(item['timestamp']) for item in disaster_items],
+        default=datetime.now(JST),
+    )
+
+    return render_template(
+        'index.html',
+        resident_notices=resident_notices,
+        disaster_items=disaster_items,
+        emergency_notice=emergency_notice,
+        selected_type=selected_type,
+        last_update=last_update.strftime('%Y年%m月%d日 %H:%M'),
+        disaster_type_options=[
+            ('all', '全て'),
+            ('emergency', '緊急'),
+            ('warning', '警報'),
+            ('advisory', '注意報'),
+            ('info', '通常'),
+        ],
+    )
 
 # ログインページ
 @app.route('/login', methods=['GET', 'POST'])
@@ -299,13 +487,20 @@ def shelter_register():
 
     if request.method == 'POST':
         shelter_name = request.form.get('name', '').strip()
+        status = request.form.get('status', 'open')
+        latitude = request.form.get('latitude', '').strip()
+        longitude = request.form.get('longitude', '').strip()
 
         if shelter_name:
             shelter_id = max((s.get('id', 0) for s in shelters), default=0) + 1
-            shelters.append({
+            shelter = {
                 'id': shelter_id,
                 'name': shelter_name,
-            })
+                'status': 'open' if status == 'open' else 'closed',
+                'latitude': float(latitude) if latitude else 40.82 + (len(shelters) % 5) * 0.012,
+                'longitude': float(longitude) if longitude else 140.74 + (len(shelters) % 4) * 0.013,
+            }
+            shelters.append(shelter)
             save_shelters()
             success = True
             message = '避難所を登録しました'
@@ -330,7 +525,7 @@ def all_shelters():
 @app.route('/board')
 @login_required
 def board():
-    resident_instructions = [i for i in instructions if i.get('target') == '住民']
+    resident_instructions = get_resident_instructions()
     return render_template('board.html', instructions=resident_instructions)
 
 # 検索結果ページ：templates/search_results.html を返す
@@ -350,6 +545,21 @@ def get_shelters():
 
     # 見つかったらリストを JSON で返す
     return jsonify(results)
+
+
+@app.route('/api/shelter_map', methods=['GET'])
+def api_shelter_map():
+    """地図表示用の避難所情報を返す"""
+    data = []
+    for shelter in shelters:
+        data.append({
+            'id': shelter.get('id'),
+            'name': shelter.get('name', '名称未設定'),
+            'status': shelter.get('status', 'open'),
+            'latitude': float(shelter.get('latitude', 40.82)),
+            'longitude': float(shelter.get('longitude', 140.74)),
+        })
+    return jsonify({'shelters': data})
 
 # 気象警報・注意報API
 @app.route('/api/weather_warnings')
