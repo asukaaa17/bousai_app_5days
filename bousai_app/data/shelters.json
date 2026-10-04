@@ -124,5 +124,19 @@
     "status": "open",
     "latitude": 40.844,
     "longitude": 140.75300000000001
+  },
+  {
+    "id": 21,
+    "name": "新しい避難所",
+    "status": "open",
+    "latitude": 40.856,
+    "longitude": 140.76600000000002
+  },
+  {
+    "id": 22,
+    "name": "新しい避難所",
+    "status": "open",
+    "latitude": 40.868,
+    "longitude": 140.779
   }
 ]

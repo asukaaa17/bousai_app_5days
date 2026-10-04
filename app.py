@@ -4,6 +4,7 @@ from functools import wraps
 import json
 import os
 import urllib.request
+from html.parser import HTMLParser
 from datetime import datetime, timedelta, timezone
 
 # app.py はプロジェクト直下に置く。
@@ -27,6 +28,9 @@ ADMIN_CREDENTIALS = {
 # 気象警報・注意報設定
 PREFECTURE_CODE = "020000"  # 青森県
 AREA_NAME = "青森市"
+AOMORI_EVACUATION_URL = (
+    "https://www.city.aomori.aomori.jp/anzen_kinkyu/saigai/1002513.html"
+)
 
 # 気象庁の市区町村コード（青森市）
 AREA_CODES = ("0220100", "1420500")
@@ -344,6 +348,118 @@ def get_resident_instructions():
     return resident_instructions
 
 
+class AomoriEvacuationPageParser(HTMLParser):
+    """青森市公式ページの本文から発令情報と掲載なし状態を抽出する"""
+    BLOCK_TAGS = {'p', 'li', 'h2', 'h3', 'h4'}
+
+    def __init__(self):
+        super().__init__()
+        self.in_content = False
+        self.block_tag = None
+        self.block_text = []
+        self.blocks = []
+        self.body_text = []
+
+    def handle_starttag(self, tag, attrs):
+        attributes = dict(attrs)
+        if tag == 'article' and attributes.get('id') == 'content':
+            self.in_content = True
+            return
+        if not self.in_content:
+            return
+        if tag in self.BLOCK_TAGS:
+            self._finish_block()
+            self.block_tag = tag
+            self.block_text = []
+
+    def handle_endtag(self, tag):
+        if not self.in_content:
+            return
+        if tag == self.block_tag:
+            self._finish_block()
+        elif tag == 'article':
+            self._finish_block()
+            self.in_content = False
+
+    def handle_data(self, data):
+        if not self.in_content:
+            return
+        text = ' '.join(data.split())
+        if text:
+            self.body_text.append(text)
+            if self.block_tag:
+                self.block_text.append(text)
+
+    def _finish_block(self):
+        if self.block_text:
+            text = ' '.join(self.block_text).strip()
+            if text:
+                self.blocks.append(text)
+        self.block_tag = None
+        self.block_text = []
+
+
+def parse_aomori_evacuation_page(page_html):
+    """青森市の公式災害情報ページを避難情報表示用データに変換する"""
+    parser = AomoriEvacuationPageParser()
+    parser.feed(page_html)
+    parser.close()
+
+    page_text = ' '.join(parser.body_text)
+    if any(
+        message in page_text
+        for message in ('現在、情報はありません', '現在、緊急情報はありません')
+    ):
+        return {
+            'notices': [],
+            'status_message': '青森市公式ページでは、現在発表されている災害情報はありません。',
+            'error': False,
+        }
+
+    notices = []
+    for content in parser.blocks:
+        if (
+            content in ('現在発表されている災害情報', 'お問い合わせ')
+            or any(marker in content for marker in (
+                'ページ番号', '印刷', 'お問い合わせ', 'お問合せ', '電話：',
+                'ファックス：', '〒030-8555', '専用フォーム',
+            ))
+        ):
+            continue
+        notices.append({
+            'content': content,
+            'created_at': '青森市公式発表',
+            'shelter': '',
+            'is_urgent': is_urgent_instruction({'content': content}),
+        })
+
+    if notices:
+        return {'notices': notices, 'status_message': '', 'error': False}
+
+    return {
+        'notices': [],
+        'status_message': '公式ページの情報を読み取れませんでした。リンク先をご確認ください。',
+        'error': True,
+    }
+
+
+def get_aomori_evacuation_info():
+    """青森市公式サイトから最新の災害・避難情報を取得する"""
+    try:
+        with urllib.request.urlopen(AOMORI_EVACUATION_URL, timeout=10) as response:
+            page_html = response.read().decode('utf-8')
+        info = parse_aomori_evacuation_page(page_html)
+        info['source_url'] = AOMORI_EVACUATION_URL
+        return info
+    except Exception:
+        return {
+            'notices': [],
+            'status_message': '青森市公式情報を取得できませんでした。リンク先をご確認ください。',
+            'error': True,
+            'source_url': AOMORI_EVACUATION_URL,
+        }
+
+
 def get_disaster_notifications(selected_type='all'):
     """青森市の最新の気象庁警報・注意報を災害情報として返す"""
     weather = get_weather_warnings()
@@ -408,7 +524,8 @@ def get_disaster_notifications(selected_type='all'):
 # トップページ：templates/index.html を返す（住民向け指示も表示する）
 @app.route('/')
 def index():
-    resident_notices = get_resident_instructions()
+    evacuation_info = get_aomori_evacuation_info()
+    resident_notices = evacuation_info['notices']
     selected_type = request.args.get('type', 'all')
     disaster_items = get_disaster_notifications(selected_type)
     emergency_notice = next((item for item in disaster_items if item['kind'] == 'emergency'), None)
@@ -421,6 +538,9 @@ def index():
     return render_template(
         'index.html',
         resident_notices=resident_notices,
+        evacuation_status_message=evacuation_info['status_message'],
+        evacuation_error=evacuation_info['error'],
+        evacuation_source_url=evacuation_info['source_url'],
         disaster_items=disaster_items,
         emergency_notice=emergency_notice,
         selected_type=selected_type,

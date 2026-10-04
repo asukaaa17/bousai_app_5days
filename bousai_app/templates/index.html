@@ -28,8 +28,8 @@
 
   <section class="card instruction-card">
     <div class="instruction-header">
-      <span class="semantic-icon" aria-label="新着指示">📣</span>
-      <h2 class="section-title">新着指示</h2>
+      <span class="semantic-icon" aria-label="青森市の避難情報">📣</span>
+      <h2 class="section-title">青森市の避難情報</h2>
     </div>
 
     <div class="instruction-list">
@@ -47,9 +47,14 @@
           {% endif %}
         </article>
       {% else %}
-        <div class="empty-message">新着の住民向け指示はありません。</div>
+        <div class="empty-message {% if evacuation_error %}instruction-source-error{% endif %}">
+          {{ evacuation_status_message }}
+        </div>
       {% endfor %}
     </div>
+    <a class="instruction-source-link" href="{{ evacuation_source_url }}" target="_blank" rel="noopener noreferrer">
+      情報源: 青森市公式「現在発表されている災害情報」
+    </a>
   </section>
 
   <section class="card map-card">

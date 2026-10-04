@@ -67,15 +67,61 @@ def test_parse_weather_warning_with_jma_format(monkeypatch):
     }]
 
 
-def test_home_page_shows_latest_resident_instructions_with_urgent_highlight():
+def test_home_page_shows_official_aomori_evacuation_notices(monkeypatch):
+    monkeypatch.setattr(app_module, 'get_aomori_evacuation_info', lambda: {
+        'notices': [{
+            'content': '青森地区に避難指示を発令しました',
+            'created_at': '青森市公式発表',
+            'shelter': '',
+            'is_urgent': True,
+        }],
+        'status_message': '',
+        'error': False,
+        'source_url': app_module.AOMORI_EVACUATION_URL,
+    })
     client = app.test_client()
     response = client.get('/')
     html = response.get_data(as_text=True)
 
     assert response.status_code == 200
-    assert '新着指示' in html
-    assert '土砂災害の危険があるため避難してください' in html
+    assert '青森市の避難情報' in html
+    assert '青森地区に避難指示を発令しました' in html
     assert 'instruction-urgent' in html
+    assert '片瀬小学校' not in html
+
+
+def test_aomori_evacuation_parser_recognizes_no_active_information():
+    page = '''
+    <article id="content">
+      <div id="voice"><h1>現在発表されている災害情報</h1></div>
+      <p>現在、情報はありません。</p>
+      <div id="reference"><p>お問い合わせ</p></div>
+    </article>
+    '''
+
+    result = app_module.parse_aomori_evacuation_page(page)
+
+    assert result['notices'] == []
+    assert result['error'] is False
+    assert '現在発表されている災害情報はありません' in result['status_message']
+
+
+def test_aomori_evacuation_parser_extracts_active_notice_only():
+        page = '''
+        <article id="content">
+            <div id="voice"><h1>現在発表されている災害情報</h1></div>
+            <p class="update">ページ番号1002513 更新日 2026年10月4日</p>
+            <ul><li>青森市A地区に避難指示を発令しました。</li></ul>
+            <div id="reference"><p>問い合わせ 電話：017-734-5059</p></div>
+        </article>
+        '''
+
+        result = app_module.parse_aomori_evacuation_page(page)
+
+        assert result['error'] is False
+        assert len(result['notices']) == 1
+        assert result['notices'][0]['content'] == '青森市A地区に避難指示を発令しました。'
+        assert result['notices'][0]['is_urgent'] is True
 
 
 def test_disaster_notifications_use_aomori_weather_warnings(monkeypatch):
